@@ -59,12 +59,20 @@ y_pts = np.array(y_coords)
 # Ищем её после экватора (когда угол phi > 90 градусов / np.pi/2)
 post_equator_indices = np.where(np.array(phi_values) > np.pi / 2)[0]
 
-if len(post_equator_indices) > 0:
-    # Ищем индекс, где координата X на этапе сужения ближе всего к заданному радиусу капилляра
-    x_post = x_pts[post_equator_indices]
-    sub_idx = (np.abs(x_post - r_capillary)).argmin()
-    idx = post_equator_indices[sub_idx]
-    status_msg = "Капля зашла за экватор и сформировала шейку!"
+if len(post_equator_indices[0]) > 0:
+    # Получаем плоский массив индексов, где контур ушел за экватор
+    indices = post_equator_indices[0]
+    
+    # Ищем индекс, где координата X ВПЕРВЫЕ после экватора пересекает радиус капилляра
+    # Мы ограничиваем поиск только первой волной (до того, как контур пойдет на второй шар)
+    idx = indices[0] # дефолтное начало
+    for i in indices:
+        if x_pts[i] <= r_capillary:
+            idx = i
+            break
+            
+    status_msg = "Идеальная одиночная капля-груша успешно выделена!"
+
 else:
     # Если капля маленькая и не дошла до экватора, берем последнюю точку
     idx = len(x_pts) - 1
