@@ -20,7 +20,7 @@ plot_placeholder = st.empty()
 
 if st.button("🚀 Запустити динаміку наливання краплі", use_container_width=True):
     # Плавне зменшення b від плоского меніска (4.0) до витягнутої груші (0.7)
-    for b_current in np.linspace(4.0, 0.7, 40):
+    for b_current in np.linspace(4.0, 0.1, 40):
         
         # Початкові умови RK4 (рівно 8 пробілів від краю для кожного рядка всередині циклу)
         x = 1e-6
