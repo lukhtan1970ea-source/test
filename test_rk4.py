@@ -49,7 +49,7 @@ if st.button("Рассчитать контур капли"):
         kx1, ky1, kphi1 = derivatives(x, y, phi)
         kx2, ky2, kphi2 = derivatives(x + 0.5*ds*kx1, y + 0.5*ds*ky1, phi + 0.5*ds*kphi1)
         kx3, ky3, kphi3 = derivatives(x + 0.5*ds*kx2, y + 0.5*ds*ky2, phi + 0.5*ds*kphi2)
-        kx4, ky4, kphi4 = derivatives(x + ds*kx3, y + ds*ky3, phi + ds*kphi4)
+        kx4, ky4, kphi4 = derivatives(x + ds*kx3, y + ds*ky3, phi + ds*kphi3)
         
         x += (ds / 6.0) * (kx1 + 2.0*kx2 + 2.0*kx3 + kx4)
         y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4)
