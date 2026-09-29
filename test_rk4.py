@@ -21,9 +21,9 @@ plot_placeholder = st.empty()
 if st.button("🚀 Запустить динамику наливания капли", use_container_width=True):
     # Плавное уменьшение b симулирует рост объема и вытягивание капли в грушу
     # Идем от плоского мениска (b=4.0) до вытянутой капли (b=1.1)
-    for b_current in np.linspace(4.0, 1.1, 40):
+    for b_current in np.linspace(4.0, 1.3, 40): # Ограничим нижний предел b для стабильности
         
-        # Почетные условия RK4
+        # Начальные условия RK4
         x = 1e-6
         y = 0.0
         phi = 0.0
@@ -38,7 +38,7 @@ if st.button("🚀 Запустить динамику наливания кап
             d_phi = 2.0 / b_current + (beta * y_v) - sin_x_term
             return d_x, d_y, d_phi
 
-        for step in range(1200):
+        for step in range(1500):
             x_coords.append(x)
             y_coords.append(y)
             
@@ -52,27 +52,33 @@ if st.button("🚀 Запустить динамику наливания кап
             y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4)
             phi += (ds / 6.0) * (kphi1 + 2.0*kphi2 + 2.0*kphi3 + kphi4)
             
-            # Условие останова: интегрируем строго до фиксированного радиуса капилляра
-            # Пусть радиус нашего виртуального капилляра равен 1.2 единицам
-            if x >= 1.2 or phi > np.pi * 1.3:
+            # ИСПРАВЛЕНО: останавливаемся, когда угол заваливается в шейку (контур сужается обратно)
+            # или если координата x начинает неестественно падать обратно к нулю
+            if phi > np.pi * 0.75 or (step > 50 and x < x_coords[-1] and phi > np.pi/2):
                 break
                 
         if len(x_coords) > 0:
             x_pts = np.array(x_coords)
             y_pts = np.array(y_coords)
             
-            # Центрируем каплю по оси Y, чтобы её верхний край (крепление) 
-            # всегда оставался неподвижным на уровне y = 0
-            final_y = y_pts[-1]
-            adjusted_y = y_pts - final_y
+            # Масштабируем контур так, чтобы конечная точка ВСЕГДА ложилась строго на радиус капилляра R = 1.2
+            scale_factor = 1.2 / x_pts[-1]
+            x_scaled = x_pts * scale_factor
+            y_scaled = y_pts * scale_factor
             
-            total_x = np.concatenate([-x_pts[::-1], x_pts])
-            total_y = np.concatenate([adjusted_y[::-1], adjusted_y])
+            # Фиксируем основание капли на y=0
+            final_y = y_scaled[-1]
+            adjusted_y = y_scaled - final_y
+            
+            total_x = np.concatenate([-x_scaled[::-1], x_scaled])
+            
+            # ИСПРАВЛЕНО: Меняем знак у Y (-adjusted_y), чтобы перевернуть каплю ВВЕРХ для микроскопа!
+            total_y = np.concatenate([-adjusted_y[::-1], -adjusted_y])
             
             # Быстрая перерисовка кадра
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=total_x, y=total_y, # капля растет вниз от y=0
+                x=total_x, y=total_y,
                 mode='lines',
                 line=dict(color='deepskyblue', width=3),
                 fill='toself',
@@ -80,15 +86,15 @@ if st.button("🚀 Запустить динамику наливания кап
             ))
             
             fig.update_layout(
-                title=dict(text=f"Наливание капли в реальном времени (b = {b_current:.2f})"),
+                title=dict(text=f"Наливание капли в микроскопе (b = {b_current:.2f})"),
                 xaxis=dict(range=[-2.5, 2.5], scaleanchor="y", scaleratio=1, fixedrange=True),
-                yaxis=dict(range=[-3.5, 0.5], fixedrange=True),
+                yaxis=dict(range=[-0.5, 4.0], fixedrange=True), # Сместим сетку вверх
                 width=500, height=500,
                 template="plotly_dark",
                 autosize=False
             )
-            # Выводим текущий кадр в контейнер без перезагрузки страницы
             plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
-            time.sleep(0.04) # Скорость анимации
+            time.sleep(0.05)
+
             
     st.balloons()
