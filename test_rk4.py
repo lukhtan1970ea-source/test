@@ -3,21 +3,24 @@ import numpy as np
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="RK4 Static Pear Test", layout="centered")
-st.title("🍐 Поиск идеальной статичной груши (RK4)")
+st.title("🍐 Интерактивный поиск статической груши (RK4)")
 
 st.markdown("""
-Мы зафиксировали параметры тяжелой капли перед отрывом ($b=0.6$, $\\beta=0.75$).
-Уравнение Янга-Лапласа интегрируется с мелким шагом. 
+Крутите слайдеры, чтобы найти параметры **физической груши**.
+* Уменьшение **b** увеличивает объём и вытягивает каплю.
+* Увеличение **Bond number (β)** усиливает влияние гравитации.
 """)
+
+# Правильные критические диапазоны для поиска груши
+b_param = st.slider("Радиус кривизны в вершине (b)", 0.15, 1.0, 0.35, 0.01)
+beta = st.slider("Параметр формы / Гравитация (Bond number / β)", 0.1, 2.0, 0.9, 0.05)
+r_capillary = st.slider("Радиус капилляра для обрезки (R)", 0.2, 1.0, 0.5, 0.05)
 
 # Почетные стартовые условия в вершине капли
 x = 1e-6
 y = 0.0
 phi = 0.0
-
-ds = 0.005  # Сверхмелкий шаг для идеальной плавности
-b_param = 0.6
-beta = 0.75
+ds = 0.002  # Ультра-мелкий шаг для точности
 
 x_coords = []
 y_coords = []
@@ -26,14 +29,12 @@ phi_values = []
 def derivatives(x_v, y_v, phi_v):
     d_x = np.cos(phi_v)
     d_y = np.sin(phi_v)
-    # Раскрытие неопределенности в нуле
     sin_x_term = 1.0 if x_v < 1e-4 else np.sin(phi_v) / x_v
-    # Классическое уравнение Янга-Лапласа
-    d_phi = 2.0 / b_param + (beta * y_v) - sin_x_term
+    d_phi = 2.0 / b_param - (beta * y_v) - sin_x_term # Исправлен знак для устойчивости роста
     return d_x, d_y, d_phi
 
-# Интегрируем Рунге-Кутту до тех пор, пока контур не пойдет глубоко на сужение
-for step in range(5000):
+# Интегрируем Рунге-Кутту с запасом
+for step in range(8000):
     x_coords.append(x)
     y_coords.append(y)
     phi_values.append(phi)
@@ -47,34 +48,42 @@ for step in range(5000):
     y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4)
     phi += (ds / 6.0) * (kphi1 + 2.0*kphi2 + 2.0*kphi3 + kphi4)
     
-    # Критический останов: когда контур прошел экватор, сузился и угол касательной стал почти вертикальным
-    if phi > np.pi * 0.92:
+    # Защитный останов, если метод уходит в бесконечность или закручивается в узел
+    if phi > np.pi * 1.5 or x < 0 or np.isnan(x) or np.isnan(y):
         break
 
 x_pts = np.array(x_coords)
 y_pts = np.array(y_coords)
 
-# Находим точку "талии" - место, где капля крепится к стеклянной трубке.
-# Пусть радиус нашего стеклянного капилляра в масштабе равен ровно 0.6 единицам.
-# Мы ищем эту координату на этапе сужения капли (в конце массива)
-idx = (np.abs(x_pts - 0.6)).argmin()
+# Пытаемся найти точку обрезки на капилляре
+# Ищем её после экватора (когда угол phi > 90 градусов / np.pi/2)
+post_equator_indices = np.where(np.array(phi_values) > np.pi / 2)[0]
 
-# Обрезаем расчетный массив строго по границе капилляра
+if len(post_equator_indices) > 0:
+    # Ищем индекс, где координата X на этапе сужения ближе всего к заданному радиусу капилляра
+    x_post = x_pts[post_equator_indices]
+    sub_idx = (np.abs(x_post - r_capillary)).argmin()
+    idx = post_equator_indices[sub_idx]
+    status_msg = "Капля зашла за экватор и сформировала шейку!"
+else:
+    # Если капля маленькая и не дошла до экватора, берем последнюю точку
+    idx = len(x_pts) - 1
+    status_msg = "Капля слишком маленькая, шейка ещё не сформировалась. Уменьшайте 'b' или увеличивайте 'β'."
+
 x_final = x_pts[:idx+1]
 y_final = y_pts[:idx+1]
 
-# Фиксируем верхний край на y = 0, чтобы капля росла вверх (для перевернутого микроскопа)
+# Фиксируем верхний край на y = 0 (растём вверх для микроскопа)
 base_y = y_final[-1]
 adjusted_y = y_final - base_y
 
 total_x = np.concatenate([-x_final[::-1], x_final])
 total_y = np.concatenate([-adjusted_y[::-1], -adjusted_y])
 
-# Отрисовка статичного графика
+# Отрисовка
 fig = go.Figure()
-
-# Линия среза капилляра (показывает границы трубки, к которой прилипла жидкость)
-fig.add_shape(type="line", x0=-0.6, y0=0, x1=0.6, y1=0, line=dict(color="gray", width=4))
+# Серая линия капилляра
+fig.add_shape(type="line", x0=-r_capillary, y0=0, x1=r_capillary, y1=0, line=dict(color="gray", width=4))
 
 fig.add_trace(go.Scatter(
     x=total_x, y=total_y,
@@ -82,16 +91,20 @@ fig.add_trace(go.Scatter(
     line=dict(color='deepskyblue', width=4),
     fill='toself',
     fillcolor='rgba(135, 206, 250, 0.3)',
-    name="Контур RK4"
+    name="RK4 Контур"
 ))
 
 fig.update_layout(
-    title="Статический профиль капли-груши (Чистый RK4)",
-    xaxis=dict(range=[-1.5, 1.5], scaleanchor="y", scaleratio=1, title="X"),
-    yaxis=dict(range=[-0.2, 2.0], title="Y"),
+    title="Поиск профиля капли-груши (Чистый RK4)",
+    xaxis=dict(range=[-2.0, 2.0], scaleanchor="y", scaleratio=1, title="X"),
+    yaxis=dict(range=[-0.2, 3.5], title="Y"),
     width=500, height=500,
     template="plotly_dark"
 )
 
 st.plotly_chart(fig)
-st.success(f"Расчет завершен. Максимальный радиус капли: {np.max(x_final):.2f}, Радиус шейки на капилляре: {x_final[-1]:.2f}")
+
+if len(post_equator_indices) > 0:
+    st.success(f"✅ {status_msg} Макс. радиус пуза: {np.max(x_final):.2f}")
+else:
+    st.info(f"💡 {status_msg}")
