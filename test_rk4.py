@@ -3,24 +3,24 @@ import numpy as np
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="RK4 Static Pear Test", layout="centered")
-st.title("🍐 Интерактивный поиск статической груши (RK4)")
+st.title("Pear-Shaped Drop Solver (RK4)")
 
 st.markdown("""
-Крутите слайдеры, чтобы найти параметры **физической груши**.
-* Уменьшение **b** увеличивает объём и вытягивает каплю.
-* Увеличение **Bond number (β)** усиливает влияние гравитации.
+Крутіть слайдери, щоб знайти параметри **фізичної груші**.
+* Зменшення **b** збільшує об'єм та витягує краплю.
+* Збільшення **Bond number (β)** посилює вплив гравітації.
 """)
 
-# Правильные критические диапазоны для поиска груши
-b_param = st.slider("Радиус кривизны в вершине (b)", 0.15, 1.0, 0.35, 0.01)
-beta = st.slider("Параметр формы / Гравитация (Bond number / β)", 0.1, 2.0, 0.9, 0.05)
-r_capillary = st.slider("Радиус капилляра для обрезки (R)", 0.2, 1.0, 0.5, 0.05)
+# Параметри форми для пошуку груші
+b_param = st.slider("Радіус кривизни у вершині (b)", 0.15, 1.0, 0.35, 0.01)
+beta = st.slider("Параметр форми / Гравітація (Bond number / β)", 0.1, 2.0, 0.9, 0.05)
+r_capillary = st.slider("Радіус капіляра для обрізки (R)", 0.2, 1.0, 0.5, 0.05)
 
-# Почетные стартовые условия в вершине капли
+# Початкові умови у вершині краплі
 x = 1e-6
 y = 0.0
 phi = 0.0
-ds = 0.002  # Ультра-мелкий шаг для точности
+ds = 0.002  # Наддрібний крок для високої точності
 
 x_coords = []
 y_coords = []
@@ -30,10 +30,10 @@ def derivatives(x_v, y_v, phi_v):
     d_x = np.cos(phi_v)
     d_y = np.sin(phi_v)
     sin_x_term = 1.0 if x_v < 1e-4 else np.sin(phi_v) / x_v
-    d_phi = 2.0 / b_param - (beta * y_v) - sin_x_term # Исправлен знак для устойчивости роста
+    d_phi = 2.0 / b_param - (beta * y_v) - sin_x_term
     return d_x, d_y, d_phi
 
-# Интегрируем Рунге-Кутту с запасом
+# Інтегруємо Рунге-Кутту з великим запасом кроків
 for step in range(8000):
     x_coords.append(x)
     y_coords.append(y)
@@ -48,50 +48,47 @@ for step in range(8000):
     y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4)
     phi += (ds / 6.0) * (kphi1 + 2.0*kphi2 + 2.0*kphi3 + kphi4)
     
-    # Защитный останов, если метод уходит в бесконечность или закручивается в узел
-    if phi > np.pi * 1.5 or x < 0 or np.isnan(x) or np.isnan(y):
+    if phi > np.pi * 1.8 or x < 0 or np.isnan(x) or np.isnan(y):
         break
 
 x_pts = np.array(x_coords)
 y_pts = np.array(y_coords)
+phi_pts = np.array(phi_values)
 
-# Пытаемся найти точку обрезки на капилляре
-# Ищем её после экватора (когда угол phi > 90 градусов / np.pi/2)
-post_equator_indices = np.where(np.array(phi_values) > np.pi / 2)[0]
+# ІСПРАВЛЕНО: Явно витягуємо одновимірний масив індексів поза екватором за допомогою [0]
+post_equator_indices = np.where(phi_pts > np.pi / 2)[0]
 
-if len(post_equator_indices[0]) > 0:
-    # Получаем плоский массив индексов, где контур ушел за экватор
-    indices = post_equator_indices[0]
+if len(post_equator_indices) > 0:
+    # Шукаємо ПЕРШЕ пересечення з радіусом капіляра на етапі звуження шийки
+    idx = post_equator_indices[0] # дефолтне значення (початок екватора)
     
-    # Ищем индекс, где координата X ВПЕРВЫЕ после экватора пересекает радиус капилляра
-    # Мы ограничиваем поиск только первой волной (до того, как контур пойдет на второй шар)
-    idx = indices[0] # дефолтное начало
-    for i in indices:
+    for i in post_equator_indices:
+        # Як тільки радіус контуру став меншим або рівним радіусу трубки — це і є наша талія!
         if x_pts[i] <= r_capillary:
             idx = i
             break
             
-    status_msg = "Идеальная одиночная капля-груша успешно выделена!"
-
+    status_msg = "✅ Ідеальна одиночна крапля-груша успішно виділена через першу шийку!"
 else:
-    # Если капля маленькая и не дошла до экватора, берем последнюю точку
     idx = len(x_pts) - 1
-    status_msg = "Капля слишком маленькая, шейка ещё не сформировалась. Уменьшайте 'b' или увеличивайте 'β'."
+    status_msg = "💡 Крапля ще занадто мала, шийка не сформувалася. Зменшуйте 'b' або збільшуйте 'β'."
 
+# Обрізаємо масиви точок чітко по знайденому індексу першої талії
 x_final = x_pts[:idx+1]
 y_final = y_pts[:idx+1]
 
-# Фиксируем верхний край на y = 0 (растём вверх для микроскопа)
+# Фіксуємо верхній край на y = 0 (ростемо вгору для мікроскопа)
 base_y = y_final[-1]
 adjusted_y = y_final - base_y
 
 total_x = np.concatenate([-x_final[::-1], x_final])
 total_y = np.concatenate([-adjusted_y[::-1], -adjusted_y])
 
-# Отрисовка
+# Отрисовка графіка Plotly
 fig = go.Figure()
-# Серая линия капилляра
-fig.add_shape(type="line", x0=-r_capillary, y0=0, x1=r_capillary, y1=0, line=dict(color="gray", width=4))
+
+# Сіра лінія зрізу скляного капіляра трубки
+fig.add_shape(type="line", x0=-r_capillary, y0=0, x1=r_capillary, y1=0, line=dict(color="gray", width=5))
 
 fig.add_trace(go.Scatter(
     x=total_x, y=total_y,
@@ -103,7 +100,7 @@ fig.add_trace(go.Scatter(
 ))
 
 fig.update_layout(
-    title="Поиск профиля капли-груши (Чистый RK4)",
+    title="Одиночний профіль краплі-груші за Рунге-Куттою",
     xaxis=dict(range=[-2.0, 2.0], scaleanchor="y", scaleratio=1, title="X"),
     yaxis=dict(range=[-0.2, 3.5], title="Y"),
     width=500, height=500,
@@ -111,8 +108,4 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig)
-
-if len(post_equator_indices) > 0:
-    st.success(f"✅ {status_msg} Макс. радиус пуза: {np.max(x_final):.2f}")
-else:
-    st.info(f"💡 {status_msg}")
+st.success(status_msg)
