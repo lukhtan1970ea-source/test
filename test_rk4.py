@@ -5,7 +5,7 @@ st.title("🔬 Окуляр вимірювального мікроскопа")
 
 st.markdown("""
 ### Лабораторна оптична система:
-1. **Ціна поділки шкали:** строго **$0.1$ мм** (кожна маленька риска — $0.1$ мм, велика — $0.5$ мм).
+1. **Ціна поділки шкали:** строго **$0.1$ мм** (кожна дрібна риска — $0.1$ мм, велика — $0.5$ мм).
 2. **Автентична механіка:** Запустіть дозатор рідини. Вимірювальний візир плавно 
    переміщується ручками тонкої наводки прямо під окуляром мікроскопа.
 """)
@@ -29,12 +29,12 @@ if st.session_state.app_running:
         <!-- ОКУЛЯР ОПТИЧНОГО МІКРОСКОПА -->
         <svg id="drop-container" width="400" height="400" viewBox="0 0 400 400" style="background: #010401; border: 4px solid #555; border-radius: 50%; margin-bottom: 15px;">
             
-            <!-- Скляний капіляр знизу (Діаметр 2.0 мм = 200px у новому масштабі, тобто радіус 100px від центру) -->
-            <rect x="95" y="340" width="210" height="60" fill="#333" opacity="0.85" />
-            <rect x="100" y="340" width="200" height="60" fill="#010401" />
-            <line x1="100" y1="340" x2="300" y2="340" stroke="#666" stroke-width="3" />
+            <!-- Скляний капіляр знизу (Зменшений радіус 55px для правильних пропорцій груші) -->
+            <rect x="142" y="340" width="116" height="60" fill="#333" opacity="0.85" />
+            <rect x="145" y="340" width="110" height="60" fill="#010401" />
+            <line x1="145" y1="340" x2="255" y2="340" stroke="#666" stroke-width="3" />
 
-            <!-- Контур краплі (росте ВГОРУ) -->
+            <!-- Контур краплі (росте ВГОРУ від капіляра) -->
             <path id="fluid-drop" d="" fill="rgba(100, 210, 255, 0.43)" stroke="lightskyblue" stroke-width="2.5" stroke-linejoin="round" />
             
             <!-- Летяча сфера відриву -->
@@ -72,22 +72,26 @@ if st.session_state.app_running:
         const valX = document.getElementById('val-x');
         const valY = document.getElementById('val-y');
 
+        // ----------------------------------------------------
+        // НОВИЙ МАСШТАБ ШКАЛИ: 1 мм = 60 пікселів, крок 6px = 0.1 мм
+        // ----------------------------------------------------
         function updateMicroscopeGrid() {
             let x_mm = parseFloat(sliderX.value);
             let y_mm = parseFloat(sliderY.value);
             valX.innerText = x_mm.toFixed(2);
             valY.innerText = y_mm.toFixed(2);
 
-            let px_x = 200 + (x_mm * 100); 
-            let px_y = 200 - (y_mm * 100);
+            let px_x = 200 + (x_mm * 60); // 1 мм = 60 px
+            let px_y = 200 - (y_mm * 60);
 
             lineX.setAttribute('x1', px_x); lineX.setAttribute('x2', px_x);
             lineY.setAttribute('y1', px_y); lineY.setAttribute('y2', px_y);
 
             let html = '';
-            for (let i = -200; i <= 200; i += 10) {
-                let is_major = (i % 50 === 0); 
-                let t_len = is_major ? 14 : 7;
+            // Малюємо компактні ризики з кроком 6 пікселів (що дорівнює строго 0.1 мм)
+            for (let i = -180; i <= 180; i += 6) {
+                let is_major = (i % 30 === 0); // велика риска через кожні 0.5 мм (5 поділок * 6px = 30px)
+                let t_len = is_major ? 12 : 6;
                 html += `<line x1="${px_x + i}" y1="${px_y - t_len}" x2="${px_x + i}" y2="${px_y + t_len}" stroke="rgba(255,0,0,0.85)" stroke-width="${is_major ? 1.2 : 0.8}" />`;
             }
             ticksContainer.innerHTML = html;
@@ -96,12 +100,15 @@ if st.session_state.app_running:
         sliderY.addEventListener('input', updateMicroscopeGrid);
         updateMicroscopeGrid();
 
+        // ----------------------------------------------------
+        // ІЗЯЩНИЙ КОМПАКТНИЙ ДВИГУН ГРУШІ (R_капіляра = 55px)
+        // ----------------------------------------------------
         function generatePearContour(progress) {
             let points = []; let steps = 140; 
-            let totalH = 2.0 + (progress * 148.0); 
-            let baseR = 100;                     
-            let maxBulbR = baseR + (progress * 55); 
-            let neckR = baseR - (Math.pow(progress, 2.0) * 8.0); 
+            let totalH = 2.0 + (progress * 135.0); // Максимальна висота краплі ~137px
+            let baseR = 55;                      // R = 1.0 мм = 55px (Діаметр 2 мм = 110px)
+            let maxBulbR = baseR + (progress * 25); // Пузо тепер акуратне і не роздуте на весь екран
+            let neckR = baseR - (Math.pow(progress, 2.0) * 5.0); // Плавна талія шийки
 
             for (let i = 0; i <= steps; i++) {
                 let t = i / steps; let y = 340 - (t * totalH); let r = baseR;
@@ -116,7 +123,7 @@ if st.session_state.app_running:
                 }
                 points.push({x: 200 - r, y: y});
             }
-            let dPath = `M 100,340`;
+            let dPath = `M 145,340`;
             for (let pt of points) dPath += ` L ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
             for (let i = points.length - 1; i >= 0; i--) {
                 dPath += ` L ${(200 + (200 - points[i].x)).toFixed(1)},${points[i].y.toFixed(1)}`;
@@ -138,14 +145,14 @@ if st.session_state.app_running:
                 window.lastH = contour.h; window.lastR = contour.r;
             } else if (p <= 0.88) {
                 let snapProgress = (p - 0.82) / 0.06;
-                let stretchH = window.lastH + (snapProgress * 25);
-                let snapNeckR = (100 - (0.82 * 8.0)) * (1.0 - snapProgress) + 6.0 * snapProgress;
+                let stretchH = window.lastH + (snapProgress * 20);
+                let snapNeckR = (55 - (0.82 * 5.0)) * (1.0 - snapProgress) + 4.0 * snapProgress;
                 let points = [];
                 for (let i = 0; i <= 140; i++) {
-                    let t = i / 140; let y = 340 - (t * stretchH); let r = 100;
+                    let t = i / 140; let y = 340 - (t * stretchH); let r = 55;
                     if (t < 0.45) {
                         let k = t / 0.45; let smooth = 0.5 - 0.5 * Math.cos(k * Math.PI);
-                        r = 100 - (100 - snapNeckR) * smooth;
+                        r = 55 - (55 - snapNeckR) * smooth;
                     } else if (t < 0.75) {
                         let k = (t - 0.45) / 0.30; r = snapNeckR + (window.lastR * 1.02 - snapNeckR) * Math.sin(k * Math.PI / 2);
                     } else {
@@ -153,7 +160,7 @@ if st.session_state.app_running:
                     }
                     points.push({x: 200 - r, y: y});
                 }
-                let dPath = `M 100,340`;
+                let dPath = `M 145,340`;
                 for (let pt of points) dPath += ` L ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
                 for (let i = points.length - 1; i >= 0; i--) {
                     dPath += ` L ${(200 + (200 - points[i].x)).toFixed(1)},${points[i].y.toFixed(1)}`;
@@ -161,12 +168,12 @@ if st.session_state.app_running:
                 dPath += ` Z`; pathDrop.setAttribute('d', dPath);
             } else if (p <= 0.96) {
                 let fallProgress = (p - 0.88) / 0.08;
-                let restH = 12 * (1.0 - fallProgress) + 1.0;
-                pathDrop.setAttribute('d', `M 100,340 A 100,${restH} 0 0,1 300,340 Z`);
+                let restH = 8 * (1.0 - fallProgress) + 1.0;
+                pathDrop.setAttribute('d', `M 145,340 A 55,${restH} 0 0,1 255,340 Z`);
                 ballFly.style.display = 'block';
                 let ballRadius = window.lastR * 0.84;
-                let startY = 340 - window.lastH - 25;
-                let curY = startY - (fallProgress * 320); 
+                let startY = 340 - window.lastH - 20;
+                let curY = startY - (fallProgress * 300); 
                 ballFly.setAttribute('cx', '200'); ballFly.setAttribute('cy', curY); ballFly.setAttribute('r', ballRadius);
             } else {
                 ballFly.style.display = 'none';
