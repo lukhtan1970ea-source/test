@@ -2,103 +2,81 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="RK4 Natural Drop Solver", layout="centered")
-st.title("🍐 Истинная физическая каплеида (Прямой RK4)")
+st.set_page_config(page_title="True Pear Shape Test", layout="centered")
+st.title("🍐 Идеальная геометрическая капля-груша")
 
 st.markdown("""
-### Прямой физический расчет (Сверху вниз от капилляра)
-Интегрируем классическое уравнение Янга-Лапласа от вершины висящей капли. 
-Капля честно провисает вниз под действием гравитации, а в конце вся картинка переворачивается для микроскопа.
+### Геометрическое моделирование профиля капли
+Контур строится на чистых тригонометрических функциях. Ползунок плавно наливает и вытягивает 
+каплю строго **вниз** от капилляра (радиус трубки жестко зафиксирован $R=1.0$ мм). 
 """)
 
-# Ползунок реального объема налитой воды в мм³
-v_fluid = st.slider("Объем поданной воды (мм³)", 4.0, 18.5, 17.5, 0.1)
+# Ползунок стадии наливания (имитирует приток массы)
+progress = st.slider("Стадия наливания капли (Ползунок объема)", 0.0, 1.0, 0.75, 0.05)
 
-# Физические константы (Вода при 20°C, капилляр радиусом строго 1.0 мм)
-R_capillary = 1.0  
-g = 9.81
-sigma = 0.07275    # Поверхностное натяжение (Н/м)
-rho = 998.2        # Плотность (кг/м³)
+# Фиксированные параметры геометрии капилляра
+R_capillary = 1.0  # Радиус трубки строго 1.0 мм (Диаметр 2.0 мм)
 
-# Капиллярная постоянная (мм^-2)
-beta_mm = (rho * g) / sigma / 1000000.0  # ~ 0.1345 мм^-2
+# Массивы точек для левой и правой половин контура
+x_left = []
+y_left = []
+x_right = []
+y_right = []
 
-# СВЯЗЬ ОБЪЕМА И КРИВИЗНЫ КУПОЛА:
-# Радиус купола b_real_mm плавно уменьшается, заставляя каплю тяжелеть и вытягиваться
-progress = v_fluid / 18.5
-b_real_mm = 2.4 - (progress * 1.55)
+# Количество точек для идеальной гладкости линии
+steps = 60
 
-# Стартовые условия RK4 в самой нижней точке (вершине) висящей капли (x=0, y=0, phi=0)
-x = 1e-6
-y = 0.0
-phi = 0.0
-ds = 0.002  # Сверхмелкий шаг интегрирования
-
-x_coords = []
-y_coords = []
-phi_values = []
-
-def derivatives(x_v, y_v, phi_v):
-    dx = np.cos(phi_v)
-    dy = np.sin(phi_v)
-    sin_x_term = 1.0 / b_real_mm if x_v < 1e-4 else np.sin(phi_v) / x_v
+# ВЫЧИСЛЕНИЕ ИДЕАЛЬНОЙ ГРУШИ:
+# Мы проходим по высоте капли от 0 (капилляр) до 1 (самый низ, вершина купола)
+for i in range(steps + 1):
+    t = i / steps  # Параметр высоты контура
     
-    # ЕСТЕСТВЕННЫЙ МИНУС: Гравитация честно тянет каплю вниз, 
-    # формируя изящную талию перед капилляром
-    dphi = 2.0 / b_real_mm - (beta_mm * y_v) - sin_x_term
-    return dx, dy, dphi
-
-# Запуск численного интегратора
-for step in range(9000):
-    x_coords.append(x)
-    y_coords.append(y)
-    phi_values.append(phi)
+    # 1. Задаем честную динамику роста капли в высоту в зависимости от ползунка
+    # Капля плавно удлиняется от плоского мениска (высота 0.6 мм) до длинной груши (высота 3.2 мм)
+    total_height = 0.6 + (progress * 2.6)
+    y_val = -(t * total_height) # знак минус, так как капля висит строго ВНИЗ
     
-    kx1, ky1, kphi1 = derivatives(x, y, phi)
-    kx2, ky2, kphi2 = derivatives(x + 0.5*ds*kx1, y + 0.5*ds*ky1, phi + 0.5*ds*kphi1)
-    kx3, ky3, kphi3 = derivatives(x + 0.5*ds*kx2, y + 0.5*ds*ky2, phi + 0.5*ds*kphi2)
-    kx4, ky4, kphi4 = derivatives(x + ds*kx3, y + ds*ky3, phi + ds*kphi3)
+    # 2. Динамика формирования пуза и талии
+    # Максимальный радиус пуза растет, выходя за пределы капилляра (до 1.35 мм)
+    max_bulb_radius = 1.0 + (progress * 0.35)
     
-    x += (ds / 6.0) * (kx1 + 2.0*kx2 + 2.0*kx3 + kx4)
-    y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4)
-    phi += (ds / 6.0) * (kphi1 + 2.0*kphi2 + 2.0*kphi3 + kphi4)
+    # Радиус шейки (талии) плавно сужается строго ВНУТРИ контура (до 0.88 мм, то есть уже капилляра!)
+    cur_neck_radius = 1.0 - (progress * 0.12)
     
-    # ИСПРАВЛЕННЫЙ ОСТАНОВ: Даем пузу расшириться наружу (x может быть больше 1.0),
-    # проходим экватор (phi > 90 град) и останавливаемся только тогда, 
-    # когда на этапе сужения шейки радиус X упал обратно до радиуса капилляра 1.0 мм!
-    if phi > np.pi / 2 and x <= R_capillary:
-        break
+    # Математическая сборка изящного силуэта груши
+    if t < 0.22:
+        # ВЕРХНЯЯ ЧАСТЬ: Короткая вогнутая шейка прямо под стеклом (плавный косинусоидальный прогиб)
+        k = t / 0.22
+        factor = 0.5 - 0.5 * np.cos(k * np.pi)
+        r_val = 1.0 - (1.0 - cur_neck_radius) * factor
+    else:
+        # НИЖНЯЯ ЧАСТЬ: Объемное пузо капли переходящее в идеальный круглый купол
+        k = (t - 0.22) / 0.78
         
-    if phi > np.pi * 1.4 or x < 0 or np.isnan(x) or np.isnan(y):
-        break
+        # Сначала линия расширяется от шейки к максимальному пузу
+        r_base = cur_neck_radius + (max_bulb_radius - cur_neck_radius) * np.sin(k * np.pi / 2)
+        
+        # А на самом конце (на макушке) замыкается в идеальную окружность по закону Пифагора
+        if k > 0.5:
+            edge = (k - 0.5) / 0.5
+            r_val = r_base * np.sqrt(max(0.0, 1.0 - edge * edge))
+        else:
+            r_val = r_base
 
-x_pts = np.array(x_coords)
-y_pts = np.array(y_coords)
-phi_pts = np.array(phi_values)
+    # Сохраняем координаты
+    x_left.append(-r_val)
+    y_left.append(y_val)
+    x_right.insert(0, r_val)
+    y_right.insert(0, y_val)
 
-# Защитная фиксация точки контакта на стекле трубки
-x_pts[-1] = R_capillary
+# Склеиваем левую и правую стороны в один сплошной замкнутый контур
+total_x = np.array(x_left + x_right)
+total_y = np.array(y_left + y_right)
 
-# Находим шейку капли (минимальный радиус на этапе сужения после экватора)
-post_equator_idx = np.where(phi_pts > np.pi / 2)[0]
-if len(post_equator_idx) > 0:
-    neck_idx = post_equator_idx[x_pts[post_equator_idx].argmin()]
-    physical_neck_radius = x_pts[neck_idx]
-else:
-    physical_neck_radius = R_capillary
-
-# ЗЕРКАЛЬНЫЙ ПЕРЕВОРОТ ДЛЯ МИКРОСКОПА:
-# Вычитаем y_pts[-1], чтобы плоскость стекла была на y = 0, 
-# и ставим знак минус перед adjusted_y, отправляя каплю расти ВВЕРХ
-adjusted_y = y_pts - y_pts[-1]
-
-total_x = np.concatenate([-x_pts[::-1], x_pts])
-total_y = np.concatenate([-adjusted_y[::-1], -adjusted_y])
-
-# Отрисовка
+# Отрисовка интерактивного графика Plotly в миллиметрах
 fig = go.Figure()
 
-# Срез стеклянного капилляра трубки радиусом строго 1.0 мм (диаметр 2.0 мм)
+# Серая линия торца стеклянного капилляра трубки (зафиксирована строго от -1.0 до 1.0 мм)
 fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
 
 fig.add_trace(go.Scatter(
@@ -107,16 +85,23 @@ fig.add_trace(go.Scatter(
     line=dict(color='deepskyblue', width=4),
     fill='toself',
     fillcolor='rgba(100, 200, 255, 0.35)',
-    name="Контур Янга-Лапласа"
+    name="Контур груши"
 ))
 
 fig.update_layout(
-    title=f"Истинный физический профиль капли Вода (H2O)",
-    xaxis=dict(range=[-1.6, 1.6], scaleanchor="y", scaleratio=1, title="Радиус капли (мм)"),
-    yaxis=dict(range=[-0.2, 3.5], title="Высота капли под микроскопом (мм)"),
+    title=f"Профиль висящей капли (Стадия: {progress:.2f})",
+    xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, title="Радиус капли (мм)"),
+    yaxis=dict(range=[-3.8, 0.5], title="Высота капли (мм)"), # Сетка уходит вниз
     width=550, height=550,
     template="plotly_dark"
 )
 
 st.plotly_chart(fig)
-st.info(f"📐 **Геометрия:** Радиус трубки: {R_capillary:.2f} мм. Радиус шейки капли: {physical_neck_radius:.3f} мм.")
+
+# Вывод геометрии в текстовую панель
+st.info(f"""
+📐 **Параметры текущей формы капли:**
+* Радиус трубки капилляра: **{R_capillary:.2f} мм** (Диаметр 2.00 мм)
+* Текущая высота провисания: **{total_height:.2f} мм**
+* Текущий радиус шейки (талии) капли: **{cur_neck_radius:.3f} мм** (Шейка меньше трубки на {1.0 - cur_neck_radius:.2f} мм!)
+""")
