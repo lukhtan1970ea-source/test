@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 
 st.set_page_config(page_title="Perfect Hydrodynamic Drop", layout="centered")
 st.title("🔬 Високоточна симуляція капілярної краплі")
@@ -10,10 +9,10 @@ st.markdown("""
 що гарантує **100% плавність без трясіння графіка, завісань та зламів контуру**.
 """)
 
-# КНОПКА ЗАПУСКА НА СТОРОНЕ PYTHON
+# КНОПКА ЗАПУСКУ НА СТОРОНІ PYTHON
 if st.button("🚀 Запустити безкінечну анімацію дозатора", use_container_width=True):
 
-    # Идеальный математический HTML/JS/SVG рушій каплеїди
+    # Ідеальний математичний HTML/JS/SVG рушій каплеїди
     svg_html = """
     <div style="background: #111; padding: 15px; border-radius: 12px; width: 430px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
         <svg id="drop-container" width="400" height="500" viewBox="0 0 400 500" style="background: #050505; border: 2px solid #333; border-radius: 8px;">
@@ -30,6 +29,11 @@ if st.button("🚀 Запустити безкінечну анімацію до
     </div>
 
     <script>
+        // Скидаємо та очищуємо старі змінні при кожній ініціалізації вікна
+        if (window.animFrameId) {
+            cancelAnimationFrame(window.animFrameId);
+        }
+
         const pathDrop = document.getElementById('fluid-drop');
         const ballFly = document.getElementById('flying-ball');
         
@@ -37,15 +41,15 @@ if st.button("🚀 Запустити безкінечну анімацію до
             let points = [];
             let steps = 140; 
             
-            // СТРОГИЙ СТАРТ С ПЛОСКОГО МЕНИСКА:
-            // На самом старте (progress=0) высота капли всего 0.5 пикселя (абсолютно плоская линза)
+            // СТРОГИЙ СТАРТ З ПЛОСКОГО МЕНІСКА:
+            // На самому початку (progress=0) висота краплі всього 0.5 пікселя
             let totalH = 0.5 + (progress * 149.5); 
             let baseR = 30;                     
             
-            // На старте пузо полностью прижато к краям трубки и равно 30px
+            // На старті максимальний радіус точно дорівнює радіусу трубки (крапля ще не роздута)
             let maxBulbR = baseR + (progress * 28); 
             
-            // Шейка сужается изящно и только на поздних этапах вытягивания груши
+            // Шийка звужується плавно і тільки на пізніх етапах видовження груші
             let neckR = baseR - (Math.pow(progress, 2.0) * 5.5);   
 
             for (let i = 0; i <= steps; i++) {
@@ -152,12 +156,11 @@ if st.button("🚀 Запустити безкінечну анімацію до
                 ballFly.setAttribute('cy', 450 + (finalProgress * 150));
             }
 
-            requestAnimationFrame(animationFrame);
+            window.animFrameId = requestAnimationFrame(animationFrame);
         }
-        requestAnimationFrame(animationFrame);
+        window.animFrameId = requestAnimationFrame(animationFrame);
     </script>
     """
 
-    # ПРОБИВАЕМ КЕШ: Добавляем уникальный штамп времени к iframe на каждом перезапуске приложения
-    cache_buster = int(time.time())
-    st.components.v1.html(svg_html, height=530, scrolling=False, key=f"drop_container_{cache_buster}")
+    # Викликаємо компонент без помилкового аргументу 'key'
+    st.components.v1.html(svg_html, height=530, scrolling=False)
