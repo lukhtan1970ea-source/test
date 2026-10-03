@@ -5,9 +5,9 @@ st.title("🔬 Окуляр вимірювального мікроскопа")
 
 st.markdown("""
 ### Лабораторна оптична система:
-1. **Ціна поділки шкали:** строго **$0.1$ мм** (кожна дрібна риска — $0.1$ мм, велика — $0.5$ мм).
+1. **Справжня шкала ГОСТ:** Кожні $0.1$ мм — мала риска, $0.5$ мм — середня, а кожні $1.0$ мм — велика риска.
 2. **Автентична механіка:** Запустіть дозатор рідини. Вимірювальний візир плавно 
-   переміщується ручками тонкої наводки прямо під окуляром мікроскопа.
+   переміщується гвинтами тонкої наводки прямо під окуляром мікроскопа.
 """)
 
 if "app_running" not in st.session_state:
@@ -29,7 +29,7 @@ if st.session_state.app_running:
         <!-- ОКУЛЯР ОПТИЧНОГО МІКРОСКОПА -->
         <svg id="drop-container" width="400" height="400" viewBox="0 0 400 400" style="background: #010401; border: 4px solid #555; border-radius: 50%; margin-bottom: 15px;">
             
-            <!-- Скляний капіляр знизу (Радіус зменшено до 35px для витончених пропорцій) -->
+            <!-- Скляний капіляр знизу (Витончений радіус 35px) -->
             <rect x="162" y="340" width="76" height="60" fill="#333" opacity="0.85" />
             <rect x="165" y="340" width="70" height="60" fill="#010401" />
             <line x1="165" y1="340" x2="235" y2="340" stroke="#666" stroke-width="3" />
@@ -55,7 +55,7 @@ if st.session_state.app_running:
                 <input type="range" id="slider-x" min="-2.0" max="2.0" step="0.01" value="0" style="width: 100%; margin-top: 5px; accent-color: red;">
             </div>
             <div>
-                <label>⚙️ Гвинт Y (vertical зсув візира): <span id="val-y">0.00</span> мм</label>
+                <label>⚙️ Гвинт Y (вертикальний зсув візира): <span id="val-y">0.00</span> мм</label>
                 <input type="range" id="slider-y" min="-4.0" max="4.0" step="0.01" value="0" style="width: 100%; margin-top: 5px; accent-color: red;">
             </div>
         </div>
@@ -73,7 +73,7 @@ if st.session_state.app_running:
         const valY = document.getElementById('val-y');
 
         // ----------------------------------------------------
-        // УЛЬТРА-КОМПАКТНИЙ МАСШТАБ ШКАЛИ: 1 мм = 40 пікселів, крок 4px = 0.1 мм
+        // СПРАВЖНЯ ТРИСТУПЕНЕВА ШКАЛА: 1 мм = 40 px, крок 4px = 0.1 мм
         // ----------------------------------------------------
         function updateMicroscopeGrid() {
             let x_mm = parseFloat(sliderX.value);
@@ -81,18 +81,28 @@ if st.session_state.app_running:
             valX.innerText = x_mm.toFixed(2);
             valY.innerText = y_mm.toFixed(2);
 
-            let px_x = 200 + (x_mm * 40); // 1 мм = 40 px
+            let px_x = 200 + (x_mm * 40); 
             let px_y = 200 - (y_mm * 40);
 
             lineX.setAttribute('x1', px_x); lineX.setAttribute('x2', px_x);
             lineY.setAttribute('y1', px_y); lineY.setAttribute('y2', px_y);
 
             let html = '';
-            // Малюємо часті тонкі ризики з кроком 4 пікселі (що дорівнює строго 0.1 мм)
+            // Рахуємо поділки в штуках (1 мм = 10 поділок по 4 пікселі)
             for (let i = -160; i <= 180; i += 4) {
-                let is_major = (i % 20 === 0); // велика риска через кожні 0.5 мм (5 поділок * 4px = 20px)
-                let t_len = is_major ? 11 : 5.5;
-                html += `<line x1="${px_x + i}" y1="${px_y - t_len}" x2="${px_x + i}" y2="${px_y + t_len}" stroke="rgba(255,0,0,0.85)" stroke-width="${is_major ? 1.1 : 0.7}" />`;
+                let tick_index = i / 4; // номер риски відносного центру
+                let t_len = 5;          // за замовчуванням дециліметр (0.1 мм)
+                let stroke_w = 0.7;
+
+                if (tick_index % 10 === 0) {
+                    t_len = 14;         // кожен 1.0 мм (10 поділок) — велика риска
+                    stroke_w = 1.3;
+                } else if (tick_index % 5 === 0) {
+                    t_len = 9;          // кожен 0.5 мм (5 поділок) — середня риска
+                    stroke_w = 1.0;
+                }
+
+                html += `<line x1="${px_x + i}" y1="${px_y - t_len}" x2="${px_x + i}" y2="${px_y + t_len}" stroke="rgba(255,0,0,0.85)" stroke-width="${stroke_w}" />`;
             }
             ticksContainer.innerHTML = html;
         }
@@ -101,14 +111,14 @@ if st.session_state.app_running:
         updateMicroscopeGrid();
 
         // ----------------------------------------------------
-        // ТОНКИЙ І ВИЙШОВШИЙ В ОПТИМАЛЬНІ ПРОПОРЦІЇ ДВИГУН ГРУШІ (R_капіляра = 35px)
+        // ТОНКИЙ І ВИЙШОВШИЙ В ОПТИМАЛЬНІ ПРОПОРЦІЇ ДВИГУН ГРУШІ
         // ----------------------------------------------------
         function generatePearContour(progress) {
             let points = []; let steps = 140; 
-            let totalH = 2.0 + (progress * 115.0); // Зменшена висота для гармонії з вузьким радіусом
-            let baseR = 35;                      // R = 1.0 мм = 35px (Діаметр 2 мм = 70px)
-            let maxBulbR = baseR + (progress * 18); // Оптимальне пузо мешочка (макс. 53px, витончена груша)
-            let neckR = baseR - (Math.pow(progress, 2.0) * 3.5); // Акуратне звуження талії
+            let totalH = 2.0 + (progress * 115.0); 
+            let baseR = 35;                      
+            let maxBulbR = baseR + (progress * 18); 
+            let neckR = baseR - (Math.pow(progress, 2.0) * 3.5); 
 
             for (let i = 0; i <= steps; i++) {
                 let t = i / steps; let y = 340 - (t * totalH); let r = baseR;
@@ -183,6 +193,7 @@ if st.session_state.app_running:
         window.animFrameId = requestAnimationFrame(animationFrame);
     </script>
     """
-    st.components.v1.html(svg_html, height=540, scrolling=False)
+    # ІСПРАВЛЕНО: Збільшено висоту контейнера до 570px, щоб нижній повзунок став видно повністю!
+    st.components.v1.html(svg_html, height=570, scrolling=False)
 else:
     st.info("💡 Відкрийте затвор дозатора рідини вище, щоб налаштувати фокус та спостерігати краплю в окулярі.")
