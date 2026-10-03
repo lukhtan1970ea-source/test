@@ -1,13 +1,17 @@
 import streamlit as st
 
-st.set_page_config(page_title="Microscope Mirror Master Test", layout="centered")
-st.title("🔬 Тест окуляра мікроскопа (Перевернута геометрія + Шкала)")
+st.set_page_config(page_title="Microscope Interactive Master", layout="centered")
+st.title("🔬 Інтерактивний окуляр мікроскопа")
 
 st.markdown("""
-### Стенд фінальної збірки:
-1. **До гори дриґом:** Капіляр закріплено знизу, крапля наливається та летить строго **вгору**.
-2. **Вимірювальна шкала:** Червоне перехрестя з ризиками плавно рухається за допомогою слайдерів.
+### Повна синхронізація приладу:
+Рухайте слайдери в боковій панелі — червона вимірювальна сітка буде **плавно ковзати по екрану в реальному часі**, 
+а перевернута капля-груша продовжить безперервно капати без завісань та скидань!
 """)
+
+# ІНІЦІАЛІЗАЦІЯ СТАНУ ЗАПУСКУ (щоб дозатор не вимикався при русі слайдерів)
+if "animation_active" not in st.session_state:
+    st.session_state.animation_active = False
 
 # БОКОВА ПАНЕЛЬ КЕРУВАННЯ ШКАЛОЮ
 st.sidebar.header("🎛️ Рухома шкала візира")
@@ -18,16 +22,20 @@ mic_y = st.sidebar.slider("Зсув шкали по вертикалі Y (мм)"
 svg_mic_x = 200 + (mic_x * 50)
 svg_mic_y = 200 - (mic_y * 50)
 
-# Генеруємо червоні ризики шкали мікроскопа
-ticks_html = ""
-for i in range(-200, 201, 10):
-    t_len = 14 if i % 50 == 0 else 7
-    ticks_html += f'<line x1="{svg_mic_x + i}" y1="{svg_mic_y - t_len}" x2="{svg_mic_x + i}" y2="{svg_mic_y + t_len}" stroke="red" stroke-width="1" />'
+# УПРАВЛІННЯ КНОПКАМИ
+col_btn1, col_col2 = st.columns([2, 1])
+with col_btn1:
+    if st.button("🚀 Запустити безкінечну анімацію дозатора", use_container_width=True):
+        st.session_state.animation_active = True
+with col_col2:
+    if st.button("🛑 Зупинити", use_container_width=True):
+        st.session_state.animation_active = False
+        st.rerun()
 
-# КНОПКА ЗАПУСКУ
-if st.button("🚀 Запустити перевернуту анімацію досліду", use_container_width=True):
+# ЯКЩО АНІМАЦІЯ ЗАПУЩЕНА — РЕНДЕРИМО СТАБІЛЬНИЙ ДВИГУН
+if st.session_state.animation_active:
 
-    # ІСПРАВЛЕНО: Прибрали букву 'f' перед рядком, щоб заблокувати конфлікти фігурних дужок Python та JS
+    # Чистий шаблон без f-рядків, де координати шкали вбудовуються безпосередньо у вузли SVG
     svg_html_template = """
     <div style="background: #111; padding: 15px; border-radius: 12px; width: 430px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
         <svg id="drop-container" width="400" height="400" viewBox="0 0 400 400" style="background: #030703; border: 3px solid #333; border-radius: 50%;">
@@ -42,14 +50,17 @@ if st.button("🚀 Запустити перевернуту анімацію д
             <!-- Летяча сфера відриву (летить вгору) -->
             <circle id="flying-ball" cx="200" cy="500" r="0" fill="rgba(100, 210, 255, 0.55)" stroke="lightskyblue" stroke-width="2" style="display: none;" />
 
-            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА ПОВЕРХ УСЬОГО -->
-            <line x1="0" y1="DYNAMIC_MIC_Y" x2="400" y2="DYNAMIC_MIC_Y" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
-            <line x1="DYNAMIC_MIC_X" y1="0" x2="DYNAMIC_MIC_X" y2="400" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
-            DYNAMIC_TICKS_HTML
+            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА ПОВЕРХ УСЬОГО (Оновлюється динамічно) -->
+            <g id="microscope-grid">
+                <line x1="0" y1="DYNAMIC_MIC_Y" x2="400" y2="DYNAMIC_MIC_Y" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
+                <line x1="DYNAMIC_MIC_X" y1="0" x2="DYNAMIC_MIC_X" y2="400" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
+                DYNAMIC_TICKS_HTML
+            </g>
         </svg>
     </div>
 
     <script>
+        // Стабілізація кадрів при перезапусках Streamlit
         if (window.animFrameId) {
             cancelAnimationFrame(window.animFrameId);
         }
@@ -68,7 +79,7 @@ if st.button("🚀 Запустити перевернуту анімацію д
 
             for (let i = 0; i <= steps; i++) {
                 let t = i / steps; 
-                let y = 350 - (t * totalH);
+                let y = 350 - (t * totalH); // Зростання вгору
                 let r = baseR;
 
                 if (t < 0.35) {
@@ -176,10 +187,12 @@ if st.button("🚀 Запустити перевернуту анімацію д
     </script>
     """
 
-    # БЕЗПЕЧНА ЗАМІНА МАРКЕРІВ: Вставляємо змінні Python без конфлікту з дужками
+    # Динамічна інжекція свіжих координат шкали без зупинки JS-анімації
     svg_html = svg_html_template.replace("DYNAMIC_MIC_X", str(svg_mic_x))
     svg_html = svg_html.replace("DYNAMIC_MIC_Y", str(svg_mic_y))
     svg_html = svg_html.replace("DYNAMIC_TICKS_HTML", ticks_html)
 
-    # Запускаємо чистий HTML-компонент
+    # Виводимо холст через фіксований статичний слот
     st.components.v1.html(svg_html, height=440, scrolling=False)
+else:
+    st.info("💡 Натисніть кнопку вище, щоб активувати дозатор та запустити симуляцію.")
