@@ -47,7 +47,7 @@ def derivatives(x_v, y_v, phi_v):
     # Раскрытие неопределенности Янга-Лапласа в нуле (Лопиталь)
     sin_x_term = 1.0 / b_real_mm if x_v < 1e-4 else np.sin(phi_v) / x_v
     # Честное гидродинамическое уравнение (минус beta*y — гравитационное провисание)
-    dphi = 2.0 / b_real_mm - (beta_mm * y_v) - sin_x_term
+    dphi = 2.0 / b_real_mm + (beta_mm * y_v) - sin_x_term
     return dx, dy, dphi
 
 # Интегрируем систему RK4
