@@ -4,28 +4,30 @@ import plotly.graph_objects as go
 import time
 
 st.set_page_config(page_title="RK4 Dynamic Pear", layout="centered")
-st.title("🎬 Анимация наливания и отрыва капли-груши")
+st.title("🎬 Анімація наливання та відриву краплі-груші")
 
 st.markdown("""
-Полный гидродинамический цикл на основе нашей сглаженной геометрической модели.
-Капля плавно растет, вытягивается в плотную грушу, обрывается и летит вниз.
+Повний гідродинамічний цикл на основі нашої згладженої геометричної моделі.
+Крапля плавно росте, витягується в щільну грушу, обривається і летить вниз.
 """)
 
-# Контейнер для быстрой перерисовки кадров
+# Контейнер для швидкої перемальовки кадрів
 plot_placeholder = st.empty()
 
-if st.button("🚀 Запустить бесконечную анимацию дозатора", use_container_width=True):
-    # Бесконечный цикл симуляции работы сталагмометра
+if st.button("🚀 Запустити безкінечну анімацію дозатора", use_container_width=True):
+    frame_id = 0  # Лічильник для унікальних ID елементів Streamlit
+    
     while True:
         # ----------------------------------------------------
-        # ФАЗА 1: ПЛАВНЫЙ РОСТ И НАЛИВАНИЕ ГРУШИ (45 кадров)
+        # ФАЗА 1: ПЛАВНИЙ РОСТ ТА НАЛИВАННЯ ГРУШІ (45 кадрів)
         # ----------------------------------------------------
         for progress in np.linspace(0.0, 1.0, 45):
+            frame_id += 1
             x_left, y_left = [], []
             x_right, y_right = [], []
             steps = 80
             
-            total_height = 0.5 + (progress * 2.5) # Высота растет от 0.5 до 3.0 мм
+            total_height = 0.5 + (progress * 2.5)
             max_bulb_radius = 1.0 + (progress * 0.55)
             cur_neck_radius = 1.0 - (progress * 0.08)
             
@@ -52,7 +54,6 @@ if st.button("🚀 Запустить бесконечную анимацию д
             total_x = x_left + x_right
             total_y = y_left + y_right
             
-            # Отрисовка кадра роста
             fig = go.Figure()
             fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
             fig.add_trace(go.Scatter(
@@ -61,26 +62,26 @@ if st.button("🚀 Запустить бесконечную анимацию д
                 fill='toself', fillcolor='rgba(100, 200, 255, 0.35)'
             ))
             fig.update_layout(
-                title=dict(text=f"Стадия: Наливание фракции (Объем капли растет)"),
-                xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True, title="Радиус (мм)"),
-                yaxis=dict(range=[-5.5, 0.5], fixedrange=True, title="Высота (мм)"),
+                title=dict(text=f"Стадія: Наливання фракції (Об'єм краплі росте)"),
+                xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True, title="Радіус (мм)"),
+                yaxis=dict(range=[-5.5, 0.5], fixedrange=True, title="Висота (мм)"),
                 width=550, height=550, template="plotly_dark"
             )
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
-            time.sleep(0.04) # Скорость наливания
+            # ВИПРАВЛЕНО: Додано унікальний ключ для запобігання StreamlitDuplicateElementId
+            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key=f"f_{frame_id}")
+            time.sleep(0.04)
 
         # ----------------------------------------------------
         # ФАЗА 2: МОМЕНТ МГНОВЕННОГО ОТРИВА (Slow Motion, 5 кадров)
         # ----------------------------------------------------
-        # Запоминаем финальные размеры мешочка перед тем как превратить его в шар
         final_bulb_r = max_bulb_radius 
         final_height = total_height
         
         for snap in np.linspace(0.0, 1.0, 5):
+            frame_id += 1
             x_left, y_left = [], []
             x_right, y_right = [], []
             
-            # Ножка капли стремительно истончается в ниточку (уменьшается до 0.1 мм)
             snap_neck = cur_neck_radius * (1.0 - snap) + 0.1 * snap
             
             for i in range(steps + 1):
@@ -111,30 +112,29 @@ if st.button("🚀 Запустить бесконечную анимацию д
                 fill='toself', fillcolor='rgba(100, 200, 255, 0.35)'
             ))
             fig.update_layout(
-                title=dict(text="⚠️ КРИТИЧЕСКАЯ СТАДИЯ: Истончение шейки"),
+                title=dict(text="⚠️ КРИТИЧНА СТАДІЯ: Стоншення шийки"),
                 xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True),
                 yaxis=dict(range=[-5.5, 0.5], fixedrange=True),
                 width=550, height=550, template="plotly_dark"
             )
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
+            # ВИПРАВЛЕНО: Додано унікальний ключ
+            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key=f"f_{frame_id}")
             time.sleep(0.03)
 
         # ----------------------------------------------------
         # ФАЗА 3: ПОЛЕТ СФЕРИЧЕСКОЙ КАПЛИ ВНИЗ (12 кадров)
         # ----------------------------------------------------
-        # Оторвавшийся мешочек за счет сил поверхностного натяжения мгновенно стягивается в шар
         sphere_r = final_bulb_r * 0.85 
         start_center_y = -final_height + sphere_r
         
         for fall in np.linspace(0.0, 1.0, 12):
-            # Остаток жидкости на капилляре мгновенно втягивается в плоский мениск
+            frame_id += 1
             rest_h = 0.4 * (1.0 - fall) + 0.1
             theta = np.linspace(0, np.pi, 40)
             rest_x = list(-np.sin(theta)) + list(np.sin(theta)[::-1])
             rest_y = list(-np.cos(theta) * rest_h) + [0.0]*40
             
-            # Координаты летящего идеального шара
-            center_y = start_center_y - (fall * 2.8) # Шар стремительно падает вниз
+            center_y = start_center_y - (fall * 2.8)
             phi_sphere = np.linspace(0, 2 * np.pi, 60)
             ball_x = 0.0 + sphere_r * np.cos(phi_sphere)
             ball_y = center_y + sphere_r * np.sin(phi_sphere)
@@ -142,27 +142,25 @@ if st.button("🚀 Запустить бесконечную анимацию д
             fig = go.Figure()
             fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
             
-            # Рисуем остаток на трубке
             fig.add_trace(go.Scatter(
                 x=rest_x, y=rest_y, mode='lines',
                 line=dict(color='deepskyblue', width=3),
                 fill='toself', fillcolor='rgba(100, 200, 255, 0.25)', showlegend=False
             ))
-            # Рисуем летящую оторвавшуюся каплю-сферу
             fig.add_trace(go.Scatter(
                 x=ball_x, y=ball_y, mode='lines',
                 line=dict(color='lightskyblue', width=4),
-                fill='toself', fillcolor='rgba(100, 200, 255, 0.45)', name="Капля"
+                fill='toself', fillcolor='rgba(100, 200, 255, 0.45)', name="Крапля"
             ))
             
             fig.update_layout(
-                title=dict(text="💧 СТАТУС: Отрыв и свободное падение"),
+                title=dict(text="💧 СТАТУС: Відрив та вільне падіння"),
                 xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True),
                 yaxis=dict(range=[-5.5, 0.5], fixedrange=True),
                 width=550, height=550, template="plotly_dark"
             )
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
-            time.sleep(0.02) # Быстрый полет капли
+            # ВИПРАВЛЕНО: Додано унікальний ключ для飛行 капли
+            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key=f"f_{frame_id}")
+            time.sleep(0.02)
 
-        # Небольшая пауза перед зарождением новой капли
         time.sleep(0.3)
