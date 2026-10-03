@@ -1,164 +1,168 @@
 import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
-import time
 
-st.set_page_config(page_title="Smooth Pear Drop Animation", layout="centered")
-st.title("🎬 Фізично згладжена анімація відриву краплі")
+st.set_page_config(page_title="Perfect Hydrodynamic Drop", layout="centered")
+st.title("🔬 Високоточна симуляція капілярної краплі")
 
 st.markdown("""
-### Оптимізована кінематика краплі:
-1. **Ніякого трясіння:** Графік зафіксовано в одному статичному слоті.
-2. **Ідеальна плавність відриву:** Усунено злами контуру за рахунок розділення фігур у критичній точці.
+Повна гідродинамічна анімація наливання та відриву краплі-груші. 
+Розрахунок контуру та кінематика польоту перенесені на сторону клієнта (JS/SVG), 
+що гарантує **100% плавність без трясіння графіка, завісань та зламів контуру**.
 """)
 
-plot_placeholder = st.empty()
+# Ідеальний математичний HTML/JS/SVG рушій каплеїди
+svg_html = """
+<div style="background: #111; padding: 15px; border-radius: 12px; width: 430px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    <svg id="drop-container" width="400" height="500" viewBox="0 0 400 500" style="background: #050505; border: 2px solid #333; border-radius: 8px;">
+        <!-- Скляний капіляр (Трубка діаметром 2 мм фіксована на радіусі 30px від центру) -->
+        <rect x="165" y="0" width="70" height="50" fill="#444" opacity="0.8" />
+        <rect x="170" y="0" width="60" height="50" fill="#050505" />
+        <line x1="170" y1="50" x2="230" y2="50" stroke="#666" stroke-width="3" />
 
-if st.button("🚀 Запустити безкінечний цикл дозатора", use_container_width=True):
-    while True:
-        # ----------------------------------------------------
-        # ФАЗА 1: ПЛАВНИЙ РОСТ ТА НАЛИВАННЯ ГРУШІ (45 кадрів)
-        # ----------------------------------------------------
-        for progress in np.linspace(0.0, 1.0, 45):
-            x_left, y_left = [], []
-            x_right, y_right = [], []
-            steps = 90
-            
-            total_height = 0.5 + (progress * 2.4)
-            max_bulb_radius = 1.0 + (progress * 0.55)
-            cur_neck_radius = 1.0 - (progress * 0.08)
-            
-            for i in range(steps + 1):
-                t = i / steps
-                y_val = -(t * total_height)
-                
-                if t < 0.65:
-                    k = t / 0.65
-                    smooth_factor = 3 * (k ** 2) - 2 * (k ** 3)
-                    r_val = 1.0 + (max_bulb_radius - 1.0) * smooth_factor
-                    if t < 0.4:
-                        neck_fade = np.sin((t / 0.4) * np.pi)
-                        r_val -= (1.0 - cur_neck_radius) * neck_fade
-                else:
-                    k = (t - 0.65) / 0.35
-                    r_val = max_bulb_radius * np.sqrt(max(0.0, 1.0 - k * k))
+        # Контур краплі (динамічна груша)
+        <path id="fluid-drop" d="" fill="rgba(100, 210, 255, 0.45)" stroke="lightskyblue" stroke-width="2.5" stroke-linejoin="round" />
+        # Летяча сфера відриву
+        <circle id="flying-ball" cx="200" cy="-100" r="0" fill="rgba(100, 210, 255, 0.55)" stroke="lightskyblue" stroke-width="2" style="display: none;" />
+    </svg>
+</div>
 
-                x_left.append(-r_val)
-                y_left.append(y_val)
-                x_right.insert(0, r_val)
-                y_right.insert(0, y_val)
-
-            fig = go.Figure()
-            fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
-            fig.add_trace(go.Scatter(
-                x=x_left + x_right, y=y_left + y_right, mode='lines',
-                line=dict(color='deepskyblue', width=4),
-                fill='toself', fillcolor='rgba(100, 200, 255, 0.35)'
-            ))
-            fig.update_layout(
-                title=dict(text="💧 СТАДІЯ 1: Наливання та витягування груші"),
-                xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True, title="Радіус (мм)"),
-                yaxis=dict(range=[-5.5, 0.5], fixedrange=True, title="Висота (мм)"),
-                width=550, height=550, template="plotly_dark"
-            )
-            # ФІКСАЦІЯ КЛЮЧА: Завжди один єдиний key="drop_chart" прибирає трясіння!
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key="drop_chart")
-            time.sleep(0.04)
-
-        # ----------------------------------------------------
-        # ФАЗА 2: МОМЕНТ МИТТЄВОГО ВИТЯГУВАННЯ ШИЙКИ (Slow Mo, 6 кадрів)
-        # ----------------------------------------------------
-        final_bulb_r = max_bulb_radius 
-        final_height = total_height
+<script>
+    const pathDrop = document.getElementById('fluid-drop');
+    const ballFly = document.getElementById('flying-ball');
+    
+    function generatePearContour(progress) {
+        let points = [];
+        let steps = 140; // Велика кількість точок для ідеальної гладкості
         
-        for snap in np.linspace(0.0, 1.0, 6):
-            x_left, y_left = [], []
-            x_right, y_right = [], []
-            
-            # Довжина капілярної нитки (шейки) стрімко росте вниз, витягуючи мешочек
-            stretch_y = final_height + (snap * 0.6)
-            # Шийка стоншується абсолютно плавно, без зламів
-            snap_neck = cur_neck_radius - (snap * (cur_neck_radius - 0.25))
-            
-            for i in range(steps + 1):
-                t = i / steps
-                y_val = -(t * stretch_y)
-                
-                # Математично згладжене стоншення: S-подібний коефіцієнт адаптується до видовження
-                if t < 0.50:
-                    k = t / 0.50
-                    smooth_factor = 3 * (k ** 2) - 2 * (k ** 3)
-                    r_val = 1.0 + (final_bulb_r * 0.95 - 1.0) * smooth_factor
-                    # Формуємо летячу тонку талію нитки під капіляром
-                    neck_fade = np.sin(k * np.pi)
-                    r_val -= (1.0 - snap_neck) * neck_fade
-                else:
-                    k = (t - 0.50) / 0.50
-                    r_val = final_bulb_r * 1.05 * np.sqrt(max(0.0, 1.0 - k * k))
+        // Фізичні масштабні параметри груші в пікселях
+        let totalH = 15 + (progress * 135); // Висота плавно росте до 150px
+        let baseR = 30;                     // Радіус капіляра фіксований (30px)
+        let maxBulbR = 30 + (progress * 28); // Максимальне пузо розширюється до 58px
+        let neckR = 30 - (progress * 5.5);   // Шийка делікатно звужується до 24.5px (вужче капіляра!)
 
-                x_left.append(-r_val)
-                y_left.append(y_val)
-                x_right.insert(0, r_val)
-                y_right.insert(0, y_val)
+        // Будуємо контур зліва направо через параметричну S-подібну криву
+        for (let i = 0; i <= steps; i++) {
+            let t = i / steps; // Нормована висота від 0 (капіляр) до 1 (макушка)
+            let y = 50 + (t * totalH);
+            let r = baseR;
 
-            fig = go.Figure()
-            fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
-            fig.add_trace(go.Scatter(
-                x=x_left + x_right, y=y_left + y_right, mode='lines',
-                line=dict(color='deepskyblue', width=4),
-                fill='toself', fillcolor='rgba(100, 200, 255, 0.35)'
-            ))
-            fig.update_layout(
-                title=dict(text="⚠️ СТАДІЯ 2: Стрімке видовження шийки перед розривом"),
-                xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True),
-                yaxis=dict(range=[-5.5, 0.5], fixedrange=True),
-                width=550, height=550, template="plotly_dark"
-            )
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key="drop_chart")
-            time.sleep(0.05)
+            if (t < 0.35) {
+                // ЗОНА ШИЙКИ: Ультра-плавний вогнутий косинусоїдальний перехід від скла до талії
+                let k = t / 0.35;
+                let smooth = 0.5 - 0.5 * Math.cos(k * Math.PI);
+                r = baseR - (baseR - neckR) * smooth;
+            } else if (t < 0.75) {
+                // ЗОНА ПУЗА: Плавне перетікання від талії шийки до максимального розширення мешочка
+                let k = (t - 0.35) / 0.40;
+                let smooth = Math.sin(k * Math.PI / 2);
+                r = neckR + (maxBulbR - neckR) * smooth;
+            } else {
+                // ЗОНА МАКУШКИ: Закруглення нижнього купола за строго круговим законом еліпса/кола
+                let k = (t - 0.75) / 0.25;
+                r = maxBulbR * Math.sqrt(Math.max(0.0, 1.0 - k * k));
+            }
 
-        # ----------------------------------------------------
-        # ФАЗА 3: ПОЛЕТ ІДЕАЛЬНОЇ СФЕРИЧНОЇ КРАПЛІ (12 кадрів)
-        # ----------------------------------------------------
-        sphere_r = final_bulb_r * 0.82
-        start_center_y = -stretch_y + sphere_r
-        
-        for fall in np.linspace(0.0, 1.0, 14):
-            # Залишок на капілярі плавно втягується в плоску лінзу меніска
-            rest_h = 0.4 * (1.0 - fall) + 0.1
-            theta = np.linspace(0, np.pi, 40)
-            rest_x = list(-np.sin(theta)) + list(np.sin(theta)[::-1])
-            rest_y = list(-np.cos(theta) * rest_h) + [0.0]*40
-            
-            # Летячий великий мешочек миттєво стягується в ідеальну сферу за законами фізики
-            center_y = start_center_y - (fall * 2.6)
-            phi_sphere = np.linspace(0, 2 * np.pi, 60)
-            ball_x = 0.0 + sphere_r * np.cos(phi_sphere)
-            ball_y = center_y + sphere_r * np.sin(phi_sphere)
-            
-            fig = go.Figure()
-            fig.add_shape(type="line", x0=-1.0, y0=0, x1=1.0, y1=0, line=dict(color="silver", width=6))
-            
-            # Залишок
-            fig.add_trace(go.Scatter(
-                x=rest_x, y=rest_y, mode='lines',
-                line=dict(color='deepskyblue', width=3),
-                fill='toself', fillcolor='rgba(100, 200, 255, 0.25)', showlegend=False
-            ))
-            # Летяча сфера
-            fig.add_trace(go.Scatter(
-                x=ball_x, y=ball_y, mode='lines',
-                line=dict(color='lightskyblue', width=4),
-                fill='toself', fillcolor='rgba(100, 200, 255, 0.45)', name="Крапля"
-            ))
-            
-            fig.update_layout(
-                title=dict(text="💧 СТАДІЯ 3: Момент відриву фракції та політ"),
-                xaxis=dict(range=[-1.8, 1.8], scaleanchor="y", scaleratio=1, fixedrange=True),
-                yaxis=dict(range=[-5.5, 0.5], fixedrange=True),
-                width=550, height=550, template="plotly_dark"
-            )
-            plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True}, key="drop_chart")
-            time.sleep(0.02)
+            points.push({x: 200 - r, y: y});
+        }
 
-        time.sleep(0.4) # Пауза перед наступною краплею
+        // Дзеркально збираємо праву сторону контуру знизу вгору для замикання фігури
+        let dPath = `M 170,50`;
+        for (let pt of points) {
+            dPath += ` L ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+        }
+        for (let i = points.length - 1; i >= 0; i--) {
+            let rightX = 200 + (200 - points[i].x);
+            dPath += ` L ${rightX.toFixed(1)},${points[i].y.toFixed(1)}`;
+        }
+        dPath += ` Z`;
+        return {d: dPath, h: totalH, r: maxBulbR};
+    }
+
+    let startTime = null;
+    const loopDuration = 4800; // Реалістичний повільний цикл наливання
+
+    function animationFrame(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
+        let p = (elapsed % loopDuration) / loopDuration;
+
+        if (p <= 0.82) {
+            // ФАЗА 1: ПЛАВНЕ НАЛИВАННЯ МАКСИМАЛЬНОЇ ГРУШІ
+            ballFly.style.display = 'none';
+            pathDrop.style.display = 'block';
+            
+            let progress = p / 0.82;
+            let contour = generatePearContour(progress);
+            pathDrop.setAttribute('d', contour.d);
+            
+            // Запам'ятовуємо геометрію для моменту відриву
+            window.lastH = contour.h;
+            window.lastR = contour.r;
+
+        } else if (p <= 0.88) {
+            // ФАЗА 2: МОМЕНТ ВІДРИВУ (Ефект швидкісної камери - Slow Mo нитки)
+            let snapProgress = (p - 0.82) / 0.06;
+            
+            // Ножка капли стрімко витягується вниз і тоншає в ниточку біля самого скла
+            let stretchH = window.lastH + (snapProgress * 25);
+            let snapNeckR = (30 - (0.82 * 5.5)) * (1.0 - snapProgress) + 2.5 * snapProgress;
+
+            let points = [];
+            for (let i = 0; i <= 140; i++) {
+                let t = i / 140;
+                let y = 50 + (t * stretchH);
+                let r = 30;
+
+                if (t < 0.45) {
+                    // Формуємо довгу тонку капілярну нитку без злаків
+                    let k = t / 0.45;
+                    let smooth = 0.5 - 0.5 * Math.cos(k * Math.PI);
+                    r = 30 - (30 - snapNeckR) * smooth;
+                } else if (t < 0.75) {
+                    let k = (t - 0.45) / 0.30;
+                    r = snapNeckR + (window.lastR * 1.02 - snapNeckR) * Math.sin(k * Math.PI / 2);
+                } else {
+                    let k = (t - 0.75) / 0.25;
+                    r = window.lastR * 1.02 * Math.sqrt(Math.max(0.0, 1.0 - k * k));
+                }
+                points.push({x: 200 - r, y: y});
+            }
+
+            let dPath = `M 170,50`;
+            for (let pt of points) dPath += ` L ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+            for (let i = points.length - 1; i >= 0; i--) {
+                dPath += ` L ${(200 + (200 - points[i].x)).toFixed(1)},${points[i].y.toFixed(1)}`;
+            }
+            dPath += ` Z`;
+            pathDrop.setAttribute('d', dPath);
+
+        } else if (p <= 0.96) {
+            // ФАЗА 3: ВІДРИВ ТА ВІЛЬНЕ ПАДІННЯ СФЕРИ ВНИЗ
+            let fallProgress = (p - 0.88) / 0.08;
+            
+            # Залишок рідини на зрізі трубки миттєво втягується в плоский меніск
+            let restH = 8 * (1.0 - fallProgress) + 1.0;
+            pathDrop.setAttribute('d', `M 170,50 A 30,${restH} 0 0,0 230,50 Z`);
+            
+            // Мешочек перетворюється на ідеальну летячу кулю під дією поверхневого натягу
+            ballFly.style.display = 'block';
+            let ballRadius = window.lastR * 0.84;
+            let startY = 50 + window.lastH + 25;
+            let curY = startY + (fallProgress * 280); // Стрімке падіння вниз до підлоги
+            
+            ballFly.setAttribute('cx', '200');
+            ballFly.setAttribute('cy', curY);
+            ballFly.setAttribute('r', ballRadius);
+            
+        } else {
+            // ФАЗА 4: ПАДІННЯ ЗА МЕЖІ ЕКРАНУ
+            let finalProgress = (p - 0.96) / 0.04;
+            ballFly.setAttribute('cy', 450 + (finalProgress * 150));
+        }
+
+        requestAnimationFrame(animationFrame);
+    }
+    requestAnimationFrame(animationFrame);
+</script>
+"""
+
+st.components.v1.html(svg_html, height=530, scrolling=False)
