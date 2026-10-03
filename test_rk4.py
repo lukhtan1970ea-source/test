@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 
 st.set_page_config(page_title="Perfect Hydrodynamic Drop", layout="centered")
 st.title("🔬 Високоточна симуляція капілярної краплі")
@@ -37,16 +36,15 @@ if st.button("🚀 Запустити безкінечну анімацію до
             let points = [];
             let steps = 140; 
             
-            // СТРОГИЙ СТАРТ С ПЛОСКОГО МЕНИСКА:
-            // На самом старте (progress=0) высота капли всего 0.5 пикселя (абсолютно плоская линза)
-            let totalH = 0.5 + (progress * 149.5); 
+            // ИСПРАВЛЕНО: Стартовая высота близка к нулю для эффекта плоского мениска
+            let totalH = 2 + (progress * 148); 
             let baseR = 30;                     
             
-            // На старте пузо полностью прижато к краям трубки и равно 30px
+            // ИСПРАВЛЕНО: На старте пузо равно радиусу трубки (капля не раздута в бока)
             let maxBulbR = baseR + (progress * 28); 
             
-            // Шейка сужается изящно и только на поздних этапах вытягивания груши
-            let neckR = baseR - (Math.pow(progress, 2.0) * 5.5);   
+            // ИСПРАВЛЕНО: Шейка сужается только тогда, когда капля уже вытянулась под весом
+            let neckR = baseR - (Math.pow(progress, 1.5) * 5.5);   
 
             for (let i = 0; i <= steps; i++) {
                 let t = i / steps; 
@@ -158,6 +156,4 @@ if st.button("🚀 Запустити безкінечну анімацію до
     </script>
     """
 
-    # ПРОБИВАЕМ КЕШ: Добавляем уникальный штамп времени к iframe на каждом перезапуске приложения
-    cache_buster = int(time.time())
-    st.components.v1.html(svg_html, height=530, scrolling=False, key=f"drop_container_{cache_buster}")
+    st.components.v1.html(svg_html, height=530, scrolling=False)
