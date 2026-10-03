@@ -6,24 +6,20 @@ st.title("🔬 Інтерактивний окуляр мікроскопа")
 st.markdown("""
 ### Повна синхронізація приладу:
 Рухайте слайдери в боковій панелі — червона вимірювальна сітка буде **плавно ковзати по екрану в реальному часі**, 
-а перевернута капля-груша продовжить безперервно капати без завісань та скидань!
+а перевернута крапля-груша продовжить безперервно капати без завісань та скидань!
 """)
 
-# ІНІЦІАЛІЗАЦІЯ СТАНУ ЗАПУСКУ (щоб дозатор не вимикався при русі слайдерів)
+# 1. ІНІЦІАЛІЗАЦІЯ СТАНУ ЗАПУСКУ (щоб дозатор не вимикався при русі слайдерів)
 if "animation_active" not in st.session_state:
     st.session_state.animation_active = False
 
-# БОКОВА ПАНЕЛЬ КЕРУВАННЯ ШКАЛОЮ
+# 2. БОКОВА ПАНЕЛЬ КЕРУВАННЯ ШКАЛОЮ
 st.sidebar.header("🎛️ Рухома шкала візира")
 mic_x = st.sidebar.slider("Зсув шкали по горизонталі X (мм)", -2.0, 2.0, 0.0, 0.05)
 mic_y = st.sidebar.slider("Зсув шкали по вертикалі Y (мм)", -4.0, 4.0, 0.0, 0.05)
 
-# Перерахунок міліметрів у масштабні пікселі (1 мм = 50 пікселів)
-svg_mic_x = 200 + (mic_x * 50)
-svg_mic_y = 200 - (mic_y * 50)
-
-# УПРАВЛІННЯ КНОПКАМИ
-col_btn1, col_col2 = st.columns([2, 1])
+# 3. УПРАВЛІННЯ КНОПКАМИ СТЕНДУ
+col_btn1, col_col2 = st.columns(2)
 with col_btn1:
     if st.button("🚀 Запустити безкінечну анімацію дозатора", use_container_width=True):
         st.session_state.animation_active = True
@@ -32,10 +28,20 @@ with col_col2:
         st.session_state.animation_active = False
         st.rerun()
 
-# ЯКЩО АНІМАЦІЯ ЗАПУЩЕНА — РЕНДЕРИМО СТАБІЛЬНИЙ ДВИГУН
+# 4. ЯКЩО АНІМАЦІЯ ЗАПУЩЕНА — РОЗРАХОВУЄМО ФІЗИКУ ШКАЛИ ТА МАЛЮЄМО СЦЕНУ
 if st.session_state.animation_active:
 
-    # Чистий шаблон без f-рядків, де координати шкали вбудовуються безпосередньо у вузли SVG
+    # СУВОРИЙ РОЗРАХУНОК КООРДИНАТ ШКАЛИ ВСЕРЕДИНІ БЛОКУ АКТИВНОСТІ
+    svg_mic_x = 200 + (mic_x * 50)
+    svg_mic_y = 200 - (mic_y * 50)
+
+    # Генеруємо червоні ризики шкали мікроскопа
+    ticks_html = ""
+    for i in range(-200, 201, 10):
+        t_len = 14 if i % 50 == 0 else 7
+        ticks_html += f'<line x1="{svg_mic_x + i}" y1="{svg_mic_y - t_len}" x2="{svg_mic_x + i}" y2="{svg_mic_y + t_len}" stroke="red" stroke-width="1" />'
+
+    # Чистий шаблон без f-рядків, щоб уникнути конфліктів фігурних дужок Python та JS
     svg_html_template = """
     <div style="background: #111; padding: 15px; border-radius: 12px; width: 430px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
         <svg id="drop-container" width="400" height="400" viewBox="0 0 400 400" style="background: #030703; border: 3px solid #333; border-radius: 50%;">
@@ -50,7 +56,7 @@ if st.session_state.animation_active:
             <!-- Летяча сфера відриву (летить вгору) -->
             <circle id="flying-ball" cx="200" cy="500" r="0" fill="rgba(100, 210, 255, 0.55)" stroke="lightskyblue" stroke-width="2" style="display: none;" />
 
-            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА ПОВЕРХ УСЬОГО (Оновлюється динамічно) -->
+            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА ПОВЕРХ УСЬОГО -->
             <g id="microscope-grid">
                 <line x1="0" y1="DYNAMIC_MIC_Y" x2="400" y2="DYNAMIC_MIC_Y" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
                 <line x1="DYNAMIC_MIC_X" y1="0" x2="DYNAMIC_MIC_X" y2="400" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
@@ -60,7 +66,6 @@ if st.session_state.animation_active:
     </div>
 
     <script>
-        // Стабілізація кадрів при перезапусках Streamlit
         if (window.animFrameId) {
             cancelAnimationFrame(window.animFrameId);
         }
@@ -187,12 +192,12 @@ if st.session_state.animation_active:
     </script>
     """
 
-    # Динамічна інжекція свіжих координат шкали без зупинки JS-анімації
+    # БЕЗПЕЧНА ІНЖЕКЦІЯ СВІЖИХ КООРДИНАТ
     svg_html = svg_html_template.replace("DYNAMIC_MIC_X", str(svg_mic_x))
     svg_html = svg_html.replace("DYNAMIC_MIC_Y", str(svg_mic_y))
     svg_html = svg_html.replace("DYNAMIC_TICKS_HTML", ticks_html)
 
-    # Виводимо холст через фіксований статичний слот
+    # Виводимо на екран
     st.components.v1.html(svg_html, height=440, scrolling=False)
 else:
-    st.info("💡 Натисніть кнопку вище, щоб активувати дозатор та запустити симуляцію.")
+    st.info("💡 Натисніть кнопку вище, щоб активувати дозатор та запустити симуляцію досліду.")
