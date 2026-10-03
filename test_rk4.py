@@ -36,10 +36,15 @@ if st.button("🚀 Запустити безкінечну анімацію до
             let points = [];
             let steps = 140; 
             
-            let totalH = 15 + (progress * 135); 
+            // ИСПРАВЛЕНО: Стартовая высота близка к нулю для эффекта плоского мениска
+            let totalH = 2 + (progress * 148); 
             let baseR = 30;                     
-            let maxBulbR = 30 + (progress * 28); 
-            let neckR = 30 - (progress * 5.5);   
+            
+            // ИСПРАВЛЕНО: На старте пузо равно радиусу трубки (капля не раздута в бока)
+            let maxBulbR = baseR + (progress * 28); 
+            
+            // ИСПРАВЛЕНО: Шейка сужается только тогда, когда капля уже вытянулась под весом
+            let neckR = baseR - (Math.pow(progress, 1.5) * 5.5);   
 
             for (let i = 0; i <= steps; i++) {
                 let t = i / steps; 
